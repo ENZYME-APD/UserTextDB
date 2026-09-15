@@ -24,6 +24,10 @@ namespace RhinoUserTextDatabase.UI
         private DropDown _groupByDropDown;
         private DropDown _groupColumnDropDown;
         private DropDown _sortByDropDown;
+        private DropDown _editColumnDropDown;
+        private GridView _settingsGrid;
+        private System.Collections.ObjectModel.ObservableCollection<ColumnDefinition> _settingsDataStore;
+        private TextBox _newKeyTextBox;
         
         private DatabaseDisplayConduit _conduit;
         private DropDown _auditColumnDropDown;
@@ -71,7 +75,7 @@ namespace RhinoUserTextDatabase.UI
                 if (_groupByDropDown.SelectedIndex == 2) RefreshGrid();
             };
 
-            var editColumnDropDown = new DropDown();
+            _editColumnDropDown = new DropDown();
             var overrideValueContainer = new Panel();
             var btnApplyOverride = new Button { Text = "Apply to Selected" };
             var newKeyTextBox = new TextBox { PlaceholderText = "Key Name" };
@@ -95,60 +99,14 @@ namespace RhinoUserTextDatabase.UI
                 RhinoDoc.ActiveDoc?.Views.Redraw();
             };
 
-            Action updateEditDropDown = () =>
-            {
-                var prevEdit = editColumnDropDown.SelectedKey;
-                editColumnDropDown.Items.Clear();
-                editColumnDropDown.Items.Add("--- New Column ---");
-                foreach (var c in _columns) editColumnDropDown.Items.Add(c.Key);
-                
-                var existingEdit = editColumnDropDown.Items.FirstOrDefault(i => i.Text == prevEdit);
-                if (existingEdit != null) editColumnDropDown.SelectedKey = existingEdit.Key;
-                else editColumnDropDown.SelectedIndex = 0;
-
-                var prevGroup = _groupColumnDropDown.SelectedKey;
-                _groupColumnDropDown.Items.Clear();
-                foreach (var c in _columns) _groupColumnDropDown.Items.Add(c.Key);
-                
-                var existingGroup = _groupColumnDropDown.Items.FirstOrDefault(i => i.Text == prevGroup);
-                if (existingGroup != null) _groupColumnDropDown.SelectedKey = existingGroup.Key;
-                else if (_groupColumnDropDown.Items.Count > 0) _groupColumnDropDown.SelectedIndex = 0;
-
-                var prevAudit = _auditColumnDropDown.SelectedKey;
-                _auditColumnDropDown.Items.Clear();
-                _auditColumnDropDown.Items.Add("None");
-                foreach (var c in _columns) _auditColumnDropDown.Items.Add(c.Key);
-                
-                var existingAudit = _auditColumnDropDown.Items.FirstOrDefault(i => i.Text == prevAudit);
-                if (existingAudit != null) _auditColumnDropDown.SelectedKey = existingAudit.Key;
-                else if (_auditColumnDropDown.Items.Count > 0) _auditColumnDropDown.SelectedIndex = 0;
-
-                var prevSort = _sortByDropDown.SelectedKey;
-                _sortByDropDown.Items.Clear();
-                _sortByDropDown.Items.Add("None");
-                foreach (var c in _columns) _sortByDropDown.Items.Add(c.Key);
-                var existingSort = _sortByDropDown.Items.FirstOrDefault(i => i.Text == prevSort);
-                if (existingSort != null) _sortByDropDown.SelectedKey = existingSort.Key;
-                else if (_sortByDropDown.Items.Count > 0) _sortByDropDown.SelectedIndex = 0;
-
-                var prevSelKey = _selectKeyDropDown?.SelectedKey;
-                if (_selectKeyDropDown != null)
-                {
-                    _selectKeyDropDown.Items.Clear();
-                    foreach (var c in _columns) _selectKeyDropDown.Items.Add(c.Key);
-                    var existingSelKey = _selectKeyDropDown.Items.FirstOrDefault(i => i.Text == prevSelKey);
-                    if (existingSelKey != null) _selectKeyDropDown.SelectedKey = existingSelKey.Key;
-                    else if (_selectKeyDropDown.Items.Count > 0) _selectKeyDropDown.SelectedIndex = 0;
-                }
-            };
 
             Control currentOverrideInput = null;
             
-            editColumnDropDown.SelectedIndexChanged += (s, e) =>
+            _editColumnDropDown.SelectedIndexChanged += (s, e) =>
             {
-                if (editColumnDropDown.SelectedIndex > 0)
+                if (_editColumnDropDown.SelectedIndex > 0)
                 {
-                    var colDef = _columns[editColumnDropDown.SelectedIndex - 1];
+                    var colDef = _columns[_editColumnDropDown.SelectedIndex - 1];
                     newKeyTextBox.Text = colDef.Key;
                     optionsTextBox.Text = string.Join(", ", colDef.Options);
                     
@@ -176,9 +134,9 @@ namespace RhinoUserTextDatabase.UI
             };
             btnApplyOverride.Click += (s, e) =>
             {
-                if (editColumnDropDown.SelectedIndex <= 0 || currentOverrideInput == null) return;
+                if (_editColumnDropDown.SelectedIndex <= 0 || currentOverrideInput == null) return;
                 
-                var colKey = _columns[editColumnDropDown.SelectedIndex - 1].Key;
+                var colKey = _columns[_editColumnDropDown.SelectedIndex - 1].Key;
                 string val = "";
                 if (currentOverrideInput is DropDown dd) val = dd.SelectedKey ?? "";
                 if (currentOverrideInput is TextBox tb) val = tb.Text;
@@ -207,46 +165,95 @@ namespace RhinoUserTextDatabase.UI
                 if (_gridContainer.Content is TreeGridView grid) grid.ReloadData();
             };
 
-            addKeyButton.Click += (s, e) =>
-            {
-                var newKey = newKeyTextBox.Text.Trim();
-                if (!string.IsNullOrEmpty(newKey))
-                {
-                    if (_gridContainer.Content is TreeGridView grid) grid.DataStore = null; // Unbind data to prevent crash
-                    _dataStore.Clear();
-                    
-                    var existing = _columns.FirstOrDefault(c => c.Key.Equals(newKey, StringComparison.OrdinalIgnoreCase));
-                    var options = optionsTextBox.Text.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
-                                       .Select(o => o.Trim()).ToList();
-                    
-                    if (existing != null)
-                    {
-                        existing.Options = options;
-                        existing.IsDropdown = options.Count > 0;
+            
+            _newKeyTextBox = new TextBox { PlaceholderText = "New Column Key..." };
+            var btnAddColumn = new Button { Text = "Add Column" };
+            
+            _settingsDataStore = new System.Collections.ObjectModel.ObservableCollection<ColumnDefinition>();
+            _settingsGrid = new GridView { ShowHeader = true, GridLines = GridLines.Both, DataStore = _settingsDataStore };
+            
+            _settingsGrid.Columns.Add(new GridColumn { HeaderText = "Visible", Editable = true, DataCell = new CheckBoxCell { Binding = Binding.Property<ColumnDefinition, bool?>(c => c.IsVisible) } });
+            
+            _settingsGrid.Columns.Add(new GridColumn { HeaderText = "Key Name", Editable = true, DataCell = new TextBoxCell { Binding = Binding.Property<ColumnDefinition, string>(c => c.Key) } });
+            
+            _settingsGrid.Columns.Add(new GridColumn { HeaderText = "Dropdown?", Editable = true, DataCell = new CheckBoxCell { Binding = Binding.Property<ColumnDefinition, bool?>(c => c.IsDropdown) } });
+            
+            var optionsBinding = Binding.Delegate<ColumnDefinition, string>(
+                c => string.Join(", ", c.Options),
+                (c, val) => {
+                    c.Options = val.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Select(o => o.Trim()).ToList();
+                    c.IsDropdown = c.Options.Count > 0;
+                }
+            );
+            _settingsGrid.Columns.Add(new GridColumn { HeaderText = "Options (comma sep)", Editable = true, DataCell = new TextBoxCell { Binding = optionsBinding } });
+
+            string oldKey = null;
+            _settingsGrid.CellEditing += (s, e) => {
+                if (e.Column == 1) { oldKey = ((ColumnDefinition)e.Item).Key; }
+            };
+            
+            _settingsGrid.CellEdited += (s, e) => {
+                var colDef = (ColumnDefinition)e.Item;
+                if (e.Column == 1 && oldKey != null && oldKey != colDef.Key) {
+                    foreach (var obj in _rawObjects) {
+                        string val = obj.GetUserString(oldKey);
+                        if (val != null) {
+                            obj.SetUserString(colDef.Key, val);
+                            obj.SetUserString(oldKey, null);
+                        }
                     }
-                    else
-                    {
-                        _columns.Add(new ColumnDefinition { Key = newKey, IsDropdown = options.Count > 0, Options = options });
-                    }
-                    
-                    newKeyTextBox.Text = string.Empty;
-                    optionsTextBox.Text = string.Empty;
-                    updateEditDropDown();
+                }
+                UpdateEditDropDown();
+                RefreshSettingsGrid();
+                InitializeGrid();
+            };
+
+            btnAddColumn.Click += (s, e) => {
+                var nk = _newKeyTextBox.Text.Trim();
+                if (!string.IsNullOrEmpty(nk) && !_columns.Any(c => c.Key.Equals(nk, StringComparison.OrdinalIgnoreCase))) {
+                    _columns.Add(new ColumnDefinition { Key = nk });
+                    _newKeyTextBox.Text = string.Empty;
+                    RefreshSettingsGrid();
+                    UpdateEditDropDown();
                     InitializeGrid();
                 }
             };
             
-            removeKeyButton.Click += (s, e) =>
-            {
-                var removeKey = newKeyTextBox.Text.Trim();
-                var existing = _columns.FirstOrDefault(c => c.Key.Equals(removeKey, StringComparison.OrdinalIgnoreCase));
-                if (existing != null)
-                {
-                    if (_gridContainer.Content is TreeGridView grid) grid.DataStore = null; // Unbind data to prevent crash
-                    _dataStore.Clear(); 
-                    _columns.Remove(existing);
-                    newKeyTextBox.Text = string.Empty;
-                    updateEditDropDown();
+            var btnMoveUp = new Button { Text = "Move Up" };
+            var btnMoveDown = new Button { Text = "Move Down" };
+            var btnDeleteCol = new Button { Text = "Delete Column" };
+            
+            btnMoveUp.Click += (s, e) => {
+                if (_settingsGrid.SelectedItem is ColumnDefinition sel) {
+                    int idx = _columns.IndexOf(sel);
+                    if (idx > 0) {
+                        _columns.RemoveAt(idx);
+                        _columns.Insert(idx - 1, sel);
+                        RefreshSettingsGrid();
+                        if (sel != null) { int row = _settingsDataStore.IndexOf(sel); if (row >= 0) { _settingsGrid.SelectRow(row); } }
+                        InitializeGrid();
+                    }
+                }
+            };
+            
+            btnMoveDown.Click += (s, e) => {
+                if (_settingsGrid.SelectedItem is ColumnDefinition sel) {
+                    int idx = _columns.IndexOf(sel);
+                    if (idx >= 0 && idx < _columns.Count - 1) {
+                        _columns.RemoveAt(idx);
+                        _columns.Insert(idx + 1, sel);
+                        RefreshSettingsGrid();
+                        if (sel != null) { int row = _settingsDataStore.IndexOf(sel); if (row >= 0) { _settingsGrid.SelectRow(row); } }
+                        InitializeGrid();
+                    }
+                }
+            };
+            
+            btnDeleteCol.Click += (s, e) => {
+                if (_settingsGrid.SelectedItem is ColumnDefinition sel) {
+                    _columns.Remove(sel);
+                    RefreshSettingsGrid();
+                    UpdateEditDropDown();
                     InitializeGrid();
                 }
             };
@@ -296,13 +303,11 @@ namespace RhinoUserTextDatabase.UI
                 if (!string.IsNullOrEmpty(key) && !string.IsNullOrEmpty(val)) 
                 {
                     _isUpdatingSelection = true;
-                    
                     bool add = Eto.Forms.Keyboard.Modifiers.HasFlag(Eto.Forms.Keys.Shift);
                     bool remove = Eto.Forms.Keyboard.Modifiers.HasFlag(Eto.Forms.Keys.Control) || Eto.Forms.Keyboard.Modifiers.HasFlag(Eto.Forms.Keys.Application);
                     bool intersect = Eto.Forms.Keyboard.Modifiers.HasFlag(Eto.Forms.Keys.Alt);
                     
-                    if (!add && !remove && !intersect)
-                        RhinoDoc.ActiveDoc?.Objects.UnselectAll();
+                    if (!add && !remove && !intersect) RhinoDoc.ActiveDoc?.Objects.UnselectAll();
                         
                     foreach (var obj in _rawObjects) 
                     {
@@ -310,13 +315,9 @@ namespace RhinoUserTextDatabase.UI
                         var rhObj = RhinoDoc.ActiveDoc?.Objects.FindId(obj.ObjectId);
                         if (rhObj == null) continue;
                         
-                        if (intersect) {
-                            if (!match) rhObj.Select(false);
-                        } else if (remove) {
-                            if (match) rhObj.Select(false);
-                        } else {
-                            if (match) rhObj.Select(true, true);
-                        }
+                        if (intersect) { if (!match) rhObj.Select(false); }
+                        else if (remove) { if (match) rhObj.Select(false); }
+                        else { if (match) rhObj.Select(true, true); }
                     }
                     RhinoDoc.ActiveDoc?.Views.Redraw();
                     _isUpdatingSelection = false;
@@ -359,47 +360,42 @@ namespace RhinoUserTextDatabase.UI
             viewLayout.EndVertical();
             viewLayout.AddRow(null);
 
-            var manageLayout = new DynamicLayout { DefaultSpacing = new Size(5, 5), Padding = new Padding(10) };
-            
-            var btnRefresh2 = new Button { Text = "Reload Document" };
-            btnRefresh2.Click += (s, e) => LoadAllObjects();
-            
-            manageLayout.BeginVertical();
-            manageLayout.AddRow(btnRefresh2);
-            manageLayout.EndVertical();
-            manageLayout.AddRow(getSeparator());
-            
-            manageLayout.BeginVertical();
-            manageLayout.AddRow("Column:", editColumnDropDown);
-            manageLayout.AddRow("Key Name:", newKeyTextBox);
-            manageLayout.AddRow("Options:", optionsTextBox);
-            manageLayout.AddRow("", new StackLayout { Orientation = Orientation.Horizontal, Spacing = 5, Items = { addKeyButton, removeKeyButton } });
-            manageLayout.EndVertical();
-            manageLayout.AddRow(getSeparator());
-            manageLayout.BeginVertical();
-            manageLayout.AddRow("Batch Edit:", overrideValueContainer);
-            manageLayout.AddRow("", btnApplyOverride);
-            manageLayout.EndVertical();
-            manageLayout.AddRow(getSeparator());
-            manageLayout.BeginVertical();
-            manageLayout.AddRow("CSV Data:", new StackLayout { Orientation = Orientation.Horizontal, Spacing = 5, Items = { btnExport, btnImport } });
-            manageLayout.EndVertical();
-            manageLayout.AddRow(getSeparator());
-            var btnToggleLayout = new Button { Text = "Switch Vertical/Horizontal Layout" };
-            manageLayout.BeginVertical();
-            manageLayout.AddRow("Panel UI:", btnToggleLayout);
-            manageLayout.EndVertical();
-            manageLayout.BeginVertical();
-            manageLayout.AddRow("", _hideTypeCheckbox);
-            manageLayout.EndVertical();
-            manageLayout.AddRow(null);
+            var batchLayout = new DynamicLayout { DefaultSpacing = new Size(5, 5), Padding = new Padding(10) };
+            batchLayout.BeginVertical();
+            batchLayout.AddRow("Batch Edit", new Label { Text = "(applies to all selected objects)" });
+            batchLayout.AddRow("Target Col:", _editColumnDropDown);
+            batchLayout.AddRow("Value:", overrideValueContainer);
+            batchLayout.AddRow("", btnApplyOverride);
+            batchLayout.EndVertical();
+            batchLayout.AddRow(getSeparator());
+            batchLayout.BeginVertical();
+            batchLayout.AddRow("CSV Data:", new StackLayout { Orientation = Orientation.Horizontal, Spacing = 5, Items = { btnExport, btnImport } });
+            batchLayout.EndVertical();
+            batchLayout.AddRow(getSeparator());
+            var btnToggleLayout = new Button { Text = "Switch Vertical/Horizontal UI" };
+            batchLayout.BeginVertical();
+            batchLayout.AddRow("Panel UI:", btnToggleLayout);
+            batchLayout.EndVertical();
+            batchLayout.AddRow(null);
 
-            updateEditDropDown();
+            var settingsLayout = new DynamicLayout { DefaultSpacing = new Size(5, 5), Padding = new Padding(10) };
+            settingsLayout.BeginVertical();
+            settingsLayout.AddRow(new StackLayout { Orientation = Orientation.Horizontal, Spacing = 5, Items = { _newKeyTextBox, btnAddColumn } });
+            settingsLayout.EndVertical();
+            settingsLayout.AddRow(_settingsGrid);
+            settingsLayout.BeginVertical();
+            settingsLayout.AddRow(new StackLayout { Orientation = Orientation.Horizontal, Spacing = 5, Items = { btnMoveUp, btnMoveDown, btnDeleteCol } });
+            settingsLayout.EndVertical();
+
+            UpdateEditDropDown();
             _groupColumnDropDown.Enabled = _groupByDropDown.SelectedIndex == 2;
 
             var tabs = new TabControl();
             tabs.Pages.Add(new TabPage { Text = "View & Select", Content = viewLayout });
-            tabs.Pages.Add(new TabPage { Text = "Manage Data", Content = manageLayout });
+            tabs.Pages.Add(new TabPage { Text = "Batch Data", Content = batchLayout });
+            tabs.Pages.Add(new TabPage { Text = "Settings", Content = settingsLayout });
+
+            
 
             _gridContainer = new Panel();
             
@@ -429,7 +425,38 @@ namespace RhinoUserTextDatabase.UI
                 }
             };
             
-            Content = splitter;
+            
+            bool isUnlocked = RhinoUserTextDatabasePlugIn.Instance?.Settings.GetBool("BetaUnlocked", false) ?? false;
+            DateTime expirationDate = new DateTime(2027, 1, 1);
+            
+            if (!isUnlocked && DateTime.Now > expirationDate)
+            {
+                var expLayout = new DynamicLayout { DefaultSpacing = new Size(10, 10), Padding = new Padding(20) };
+                expLayout.BeginVertical();
+                expLayout.AddRow(new Label { Text = "The Beta period for UserText DB has expired." });
+                var passInput = new TextBox { PlaceholderText = "Enter unlock key" };
+                var btnUnlock = new Button { Text = "Unlock" };
+                
+                btnUnlock.Click += (s, e) => {
+                    var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(passInput.Text));
+                    if (encoded == "ZW56eW1lMy4wLTIwMjc=") {
+                        RhinoUserTextDatabasePlugIn.Instance?.Settings.SetBool("BetaUnlocked", true);
+                        Content = splitter;
+                    } else {
+                        Eto.Forms.MessageBox.Show("Invalid unlock key.", "Error", MessageBoxButtons.OK, MessageBoxType.Error);
+                    }
+                };
+                
+                expLayout.AddRow(new StackLayout { Orientation = Orientation.Horizontal, Spacing = 5, Items = { passInput, btnUnlock } });
+                expLayout.EndVertical();
+                expLayout.AddRow(null);
+                Content = expLayout;
+            }
+            else
+            {
+                Content = splitter;
+            }
+
 
             RhinoDoc.AddRhinoObject += OnAddObject;
             RhinoDoc.DeleteRhinoObject += OnDeleteObject;
@@ -455,12 +482,34 @@ namespace RhinoUserTextDatabase.UI
                 DeletedObjects = false
             };
             
+            var existingKeys = new HashSet<string>(_columns.Select(c => c.Key), StringComparer.OrdinalIgnoreCase);
+            bool newColumnsAdded = false;
+            
             foreach (var rhObj in RhinoDoc.ActiveDoc.Objects.GetObjectList(settings))
             {
                 _rawObjects.Add(new ObjectRowModel(rhObj));
+                var userStrings = rhObj.Attributes.GetUserStrings();
+                foreach (string key in userStrings.AllKeys)
+                {
+                    if (!existingKeys.Contains(key))
+                    {
+                        existingKeys.Add(key);
+                        _columns.Add(new ColumnDefinition { Key = key, IsDropdown = false, Options = new List<string>() });
+                        newColumnsAdded = true;
+                    }
+                }
             }
             
-            RefreshGrid();
+            if (newColumnsAdded)
+            {
+                UpdateEditDropDown();
+                RefreshSettingsGrid();
+                InitializeGrid();
+            }
+            else
+            {
+                RefreshGrid();
+            }
         }
 
         private void OnAddObject(object? sender, RhinoObjectEventArgs e)
@@ -468,7 +517,30 @@ namespace RhinoUserTextDatabase.UI
             if (e.TheObject != null && !_rawObjects.Any(r => r.ObjectId == e.TheObject.Id))
             {
                 _rawObjects.Add(new ObjectRowModel(e.TheObject));
-                RefreshGrid();
+                
+                bool newColumnsAdded = false;
+                var existingKeys = new HashSet<string>(_columns.Select(c => c.Key), StringComparer.OrdinalIgnoreCase);
+                var userStrings = e.TheObject.Attributes.GetUserStrings();
+                
+                foreach (string key in userStrings.AllKeys)
+                {
+                    if (!existingKeys.Contains(key))
+                    {
+                        existingKeys.Add(key);
+                        _columns.Add(new ColumnDefinition { Key = key, IsDropdown = false, Options = new List<string>() });
+                        newColumnsAdded = true;
+                    }
+                }
+                
+                if (newColumnsAdded)
+                {
+                    UpdateEditDropDown();
+                    InitializeGrid();
+                }
+                else
+                {
+                    RefreshGrid();
+                }
             }
         }
 
@@ -526,7 +598,7 @@ namespace RhinoUserTextDatabase.UI
                 Editable = false
             });
 
-            foreach (var colDef in _columns)
+            foreach (var colDef in _columns.Where(c => c.IsVisible))
             {
                 var columnKey = colDef.Key;
                 
@@ -744,13 +816,13 @@ namespace RhinoUserTextDatabase.UI
                 using (var writer = new System.IO.StreamWriter(dialog.FileName))
                 {
                     var headers = new List<string> { "ObjectId", "Name", "Type" };
-                    headers.AddRange(_columns.Select(c => c.Key));
+                    headers.AddRange(_columns.Where(c => c.IsVisible).Select(c => c.Key));
                     writer.WriteLine(string.Join(",", headers.Select(EscapeCsv)));
                     
                     foreach (var obj in _rawObjects)
                     {
                         var row = new List<string> { obj.ObjectId.ToString(), obj.ObjectName, obj.ObjectType };
-                        foreach (var col in _columns)
+                        foreach (var col in _columns.Where(c => c.IsVisible))
                         {
                             row.Add(EscapeCsv(obj.GetUserString(col.Key)));
                         }
@@ -861,6 +933,67 @@ namespace RhinoUserTextDatabase.UI
             return result;
         }
 
+        
+        private void UpdateEditDropDown()
+        {
+            var visibleCols = _columns.Where(c => c.IsVisible).ToList();
+            
+            var prevEdit = _editColumnDropDown?.SelectedKey;
+            if (_editColumnDropDown != null) {
+                _editColumnDropDown.Items.Clear();
+                _editColumnDropDown.Items.Add("--- New Column ---");
+                foreach (var c in visibleCols) _editColumnDropDown.Items.Add(c.Key);
+                var existingEdit = _editColumnDropDown.Items.FirstOrDefault(i => i.Text == prevEdit);
+                if (existingEdit != null) _editColumnDropDown.SelectedKey = existingEdit.Key;
+                else _editColumnDropDown.SelectedIndex = 0;
+            }
+
+            var prevGroup = _groupColumnDropDown?.SelectedKey;
+            if (_groupColumnDropDown != null) {
+                _groupColumnDropDown.Items.Clear();
+                foreach (var c in visibleCols) _groupColumnDropDown.Items.Add(c.Key);
+                var existingGroup = _groupColumnDropDown.Items.FirstOrDefault(i => i.Text == prevGroup);
+                if (existingGroup != null) _groupColumnDropDown.SelectedKey = existingGroup.Key;
+                else if (_groupColumnDropDown.Items.Count > 0) _groupColumnDropDown.SelectedIndex = 0;
+            }
+
+            var prevAudit = _auditColumnDropDown?.SelectedKey;
+            if (_auditColumnDropDown != null) {
+                _auditColumnDropDown.Items.Clear();
+                _auditColumnDropDown.Items.Add("None");
+                foreach (var c in visibleCols) _auditColumnDropDown.Items.Add(c.Key);
+                var existingAudit = _auditColumnDropDown.Items.FirstOrDefault(i => i.Text == prevAudit);
+                if (existingAudit != null) _auditColumnDropDown.SelectedKey = existingAudit.Key;
+                else if (_auditColumnDropDown.Items.Count > 0) _auditColumnDropDown.SelectedIndex = 0;
+            }
+
+            var prevSort = _sortByDropDown?.SelectedKey;
+            if (_sortByDropDown != null) {
+                _sortByDropDown.Items.Clear();
+                _sortByDropDown.Items.Add("None");
+                foreach (var c in visibleCols) _sortByDropDown.Items.Add(c.Key);
+                var existingSort = _sortByDropDown.Items.FirstOrDefault(i => i.Text == prevSort);
+                if (existingSort != null) _sortByDropDown.SelectedKey = existingSort.Key;
+                else if (_sortByDropDown.Items.Count > 0) _sortByDropDown.SelectedIndex = 0;
+            }
+
+            var prevSelKey = _selectKeyDropDown?.SelectedKey;
+            if (_selectKeyDropDown != null)
+            {
+                _selectKeyDropDown.Items.Clear();
+                foreach (var c in visibleCols) _selectKeyDropDown.Items.Add(c.Key);
+                var existingSelKey = _selectKeyDropDown.Items.FirstOrDefault(i => i.Text == prevSelKey);
+                if (existingSelKey != null) _selectKeyDropDown.SelectedKey = existingSelKey.Key;
+                else if (_selectKeyDropDown.Items.Count > 0) _selectKeyDropDown.SelectedIndex = 0;
+            }
+        }
+
+        private void RefreshSettingsGrid() {
+            _settingsDataStore.Clear();
+            foreach (var c in _columns) _settingsDataStore.Add(c);
+            if (_settingsGrid != null) { _settingsGrid.DataStore = null; _settingsGrid.DataStore = _settingsDataStore; }
+        }
+        
         public void PanelShown(uint documentSerialNumber, ShowPanelReason reason) { }
         public void PanelHidden(uint documentSerialNumber, ShowPanelReason reason) { }
         public void PanelClosing(uint documentSerialNumber, bool documentIsClosing)

@@ -1,0 +1,35 @@
+name: Publish to Rhino Package Manager
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build-and-publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '7.0.x'
+
+      - name: Build Project
+        run: dotnet build RhinoUserTextDatabase/RhinoUserTextDatabase.csproj --configuration Release
+
+      - name: Download Yak CLI
+        run: Invoke-WebRequest -Uri "https://files.mcneel.com/yak/tools/latest/yak.exe" -OutFile "yak.exe"
+
+      - name: Build Yak Package
+        run: |
+          cd RhinoUserTextDatabase/bin/Release/net7.0
+          ..\..\..\..\yak.exe build
+
+      - name: Push to Rhino Package Manager
+        env:
+          YAK_TOKEN: ${{ secrets.YAK_TOKEN }}
+        run: |
+          cd RhinoUserTextDatabase/bin/Release/net7.0
+          ..\..\..\..\yak.exe push *.yak
