@@ -39,6 +39,8 @@ namespace RhinoUserTextDatabase.UI
         private DropDown _selectKeyDropDown;
         private DropDown _selectValueDropDown;
         private CheckBox _syncSelectionCheckbox;
+        private CheckBox _showNameColumnCheckbox;
+        private CheckBox _showTypeColumnCheckbox;
         private bool _isUpdatingSelection = false;
         public UserTextDatabasePanel()
         {
@@ -397,9 +399,17 @@ namespace RhinoUserTextDatabase.UI
             batchLayout.EndVertical();
             batchLayout.AddRow(null);
 
+            
+            _showNameColumnCheckbox = new CheckBox { Text = "Show 'Name' Column", Checked = true };
+            _showNameColumnCheckbox.CheckedChanged += (s, e) => { InitializeGrid(); };
+            
+            _showTypeColumnCheckbox = new CheckBox { Text = "Show 'Type' Column", Checked = true };
+            _showTypeColumnCheckbox.CheckedChanged += (s, e) => { InitializeGrid(); };
+            
             var settingsLayout = new DynamicLayout { DefaultSpacing = new Size(5, 5), Padding = new Padding(10) };
             settingsLayout.BeginVertical();
             settingsLayout.AddRow(new StackLayout { Orientation = Orientation.Horizontal, Spacing = 5, Items = { _newKeyTextBox, btnAddColumn } });
+            settingsLayout.AddRow(new StackLayout { Orientation = Orientation.Horizontal, Spacing = 15, Items = { _showNameColumnCheckbox, _showTypeColumnCheckbox } });
             settingsLayout.EndVertical();
             settingsLayout.AddRow(_settingsGrid);
             settingsLayout.BeginVertical();
@@ -603,19 +613,25 @@ namespace RhinoUserTextDatabase.UI
             _grid.SelectionChanged += OnGridSelectionChanged;
             _grid.CellEdited += OnCellEdited;
 
-            _grid.Columns.Add(new GridColumn
+            if (_showNameColumnCheckbox.Checked == true)
             {
-                HeaderText = "Name",
-                DataCell = new TextBoxCell { Binding = Binding.Property<DatabaseTreeItem, string>(r => r.Name) },
-                Editable = true
-            });
+                _grid.Columns.Add(new GridColumn
+                {
+                    HeaderText = "Name",
+                    DataCell = new TextBoxCell { Binding = Binding.Property<DatabaseTreeItem, string>(r => r.Name) },
+                    Editable = true
+                });
+            }
 
-            _grid.Columns.Add(new GridColumn
+            if (_showTypeColumnCheckbox.Checked == true)
             {
-                HeaderText = "Type",
-                DataCell = new TextBoxCell { Binding = Binding.Property<DatabaseTreeItem, string>(r => r.Type) },
-                Editable = false
-            });
+                _grid.Columns.Add(new GridColumn
+                {
+                    HeaderText = "Type",
+                    DataCell = new TextBoxCell { Binding = Binding.Property<DatabaseTreeItem, string>(r => r.Type) },
+                    Editable = false
+                });
+            }
 
             foreach (var colDef in _columns.Where(c => c.IsVisible))
             {
@@ -665,10 +681,16 @@ namespace RhinoUserTextDatabase.UI
         {
             _lastEditedColumn = e.Column;
             var item = e.Item as DatabaseTreeItem;
-            if (item != null && e.Column != 1)
+            if (item != null)
             {
-                bool isNameCol = e.Column == 0;
-                var colDef = isNameCol ? null : _columns[e.Column - 2];
+                string header = _grid.Columns[e.Column].HeaderText;
+                if (header == "Type") return;
+                
+                bool isNameCol = header == "Name";
+                var colDef = isNameCol ? null : _columns.FirstOrDefault(c => c.Key == header);
+                
+                if (!isNameCol && colDef == null) return;
+                
                 var newValue = isNameCol ? item.Name : item.GetValue(colDef.Key);
 
                 var selectedItems = _grid.SelectedItems.OfType<DatabaseTreeItem>().ToList();
@@ -790,9 +812,21 @@ namespace RhinoUserTextDatabase.UI
             {
                 e.Handled = true;
                 
-                // If they haven't edited anything yet, default to column 2 (the first custom column)
-                // If they've edited something, use the last column they edited.
-                int colToEdit = _lastEditedColumn >= 2 ? _lastEditedColumn : 2;
+                int colToEdit = _lastEditedColumn;
+                
+                // Fallback to the first editable column if the last edited column is invalid/hidden
+                if (colToEdit < 0 || colToEdit >= _grid.Columns.Count || !_grid.Columns[colToEdit].Editable)
+                {
+                    colToEdit = 0;
+                    for (int i = 0; i < _grid.Columns.Count; i++)
+                    {
+                        if (_grid.Columns[i].Editable)
+                        {
+                            colToEdit = i;
+                            break;
+                        }
+                    }
+                }
                 
                 _grid.BeginEdit(_grid.SelectedRow, colToEdit);
             }
