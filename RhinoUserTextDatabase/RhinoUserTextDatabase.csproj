@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TargetExt>.rhp</TargetExt>
+    <GenerateYakPackage>true</GenerateYakPackage>
+    <Version>1.0.0</Version>
+    <Title>User Text Database</Title>
+    <Description>Excel-style database management for Rhino User Text.</Description>
+    <Authors>jb</Authors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Eto.Forms" Version="2.11.0" />
+    <PackageReference Include="RhinoCommon" Version="8.35.26251.13001" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="icon.ico" />
+  </ItemGroup>
+
+</Project>

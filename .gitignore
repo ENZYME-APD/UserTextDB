@@ -1,0 +1,18 @@
+# Build results
+bin/
+obj/
+
+# Visual Studio files
+.vs/
+*.user
+*.suo
+
+# Rhino specific
+*.rhp
+*.yak
+
+# Mac OS files
+.DS_Store
+
+# Patch files (we created these during development)
+*.patch
