@@ -19,6 +19,7 @@ namespace RhinoUserTextDatabase.UI
         private TreeGridView _grid;
         private Panel _gridContainer;
         private TreeGridItemCollection _dataStore;
+        private int _lastEditedColumn = 2;
         private List<ColumnDefinition> _columns;
         private List<ObjectRowModel> _rawObjects;
         private DropDown _groupByDropDown;
@@ -644,6 +645,7 @@ namespace RhinoUserTextDatabase.UI
 
         private void OnCellEdited(object? sender, GridViewCellEventArgs e)
         {
+            _lastEditedColumn = e.Column;
             var item = e.Item as DatabaseTreeItem;
             if (item != null && e.Column != 1)
             {
@@ -769,7 +771,12 @@ namespace RhinoUserTextDatabase.UI
             if (e.Key == Keys.Enter && _grid.SelectedRow >= 0)
             {
                 e.Handled = true;
-                _grid.BeginEdit(_grid.SelectedRow, 2); // default to first editable column
+                
+                // If they haven't edited anything yet, default to column 2 (the first custom column)
+                // If they've edited something, use the last column they edited.
+                int colToEdit = _lastEditedColumn >= 2 ? _lastEditedColumn : 2;
+                
+                _grid.BeginEdit(_grid.SelectedRow, colToEdit);
             }
         }
         
