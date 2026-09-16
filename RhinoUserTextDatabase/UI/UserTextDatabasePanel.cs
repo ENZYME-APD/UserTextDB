@@ -406,22 +406,16 @@ namespace RhinoUserTextDatabase.UI
             _showTypeColumnCheckbox = new CheckBox { Text = "Show 'Type' Column", Checked = true };
             _showTypeColumnCheckbox.CheckedChanged += (s, e) => { InitializeGrid(); };
             
-            var settingsLayout = new DynamicLayout { DefaultSpacing = new Size(5, 5), Padding = new Padding(10) };
-            settingsLayout.BeginVertical();
-            settingsLayout.AddRow(new StackLayout { Orientation = Orientation.Horizontal, Spacing = 5, Items = { _newKeyTextBox, btnAddColumn } });
-            settingsLayout.AddRow(new StackLayout { Orientation = Orientation.Horizontal, Spacing = 15, Items = { _showNameColumnCheckbox, _showTypeColumnCheckbox } });
-            settingsLayout.EndVertical();
-            settingsLayout.AddRow(_settingsGrid);
-            settingsLayout.BeginVertical();
-            settingsLayout.AddRow(new StackLayout { Orientation = Orientation.Horizontal, Spacing = 5, Items = { btnMoveUp, btnMoveDown, btnDeleteCol } });
-            settingsLayout.EndVertical();
+
+            var settingsLayout = new TableLayout { Spacing = new Size(5, 5), Padding = new Padding(10) };
             
+            Control footerControl = new Panel();
             try
             {
                 var asm = System.Reflection.Assembly.GetExecutingAssembly();
                 var logoImg = Eto.Drawing.Bitmap.FromResource("RhinoUserTextDatabase.Resources.logo.png", asm);
                 
-                var logoView = new ImageView { Image = logoImg, Size = new Eto.Drawing.Size(150, 48) };
+                var logoView = new ImageView { Image = logoImg, Size = new Eto.Drawing.Size(120, 38) };
                 
                 var linkSite = new LinkButton { Text = "www.weareenzyme.com" };
                 linkSite.Click += (s, e) => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = "https://www.weareenzyme.com", UseShellExecute = true });
@@ -431,27 +425,29 @@ namespace RhinoUserTextDatabase.UI
                 
                 var lblVersion = new Label { Text = "v1.0.0 Beta", TextColor = Eto.Drawing.Colors.Gray };
                 
-                var brandStack = new StackLayout
-                {
-                    Orientation = Orientation.Vertical,
-                    Spacing = 5,
-                    HorizontalContentAlignment = HorizontalAlignment.Center,
-                    Items = {
-                        new StackLayoutItem(logoView, HorizontalAlignment.Center),
-                        new StackLayoutItem(linkSite, HorizontalAlignment.Center),
-                        new StackLayoutItem(linkEmail, HorizontalAlignment.Center),
-                        new StackLayoutItem(lblVersion, HorizontalAlignment.Center)
-                    }
+                var leftStack = new StackLayout { Orientation = Orientation.Vertical, Items = { logoView }, VerticalContentAlignment = VerticalAlignment.Center };
+                var rightStack = new StackLayout { 
+                    Orientation = Orientation.Vertical, 
+                    HorizontalContentAlignment = HorizontalAlignment.Right,
+                    Spacing = 2,
+                    Items = { linkSite, linkEmail, lblVersion }
                 };
                 
-                settingsLayout.AddRow(null); // padding
-                settingsLayout.AddRow(brandStack);
-                settingsLayout.AddRow(null); // padding
+                var footerDyn = new DynamicLayout();
+                footerDyn.AddRow(leftStack, null, rightStack);
+                footerControl = footerDyn;
             }
             catch (System.Exception ex)
             {
                 Rhino.RhinoApp.WriteLine($"Error loading branding: {ex.Message}");
             }
+
+            settingsLayout.Rows.Add(new TableRow(new StackLayout { Orientation = Orientation.Horizontal, Spacing = 5, Items = { _newKeyTextBox, btnAddColumn } }));
+            settingsLayout.Rows.Add(new TableRow(new StackLayout { Orientation = Orientation.Horizontal, Spacing = 15, Items = { _showNameColumnCheckbox, _showTypeColumnCheckbox } }));
+            settingsLayout.Rows.Add(new TableRow { Cells = { _settingsGrid }, ScaleHeight = true });
+            settingsLayout.Rows.Add(new TableRow(new StackLayout { Orientation = Orientation.Horizontal, Spacing = 5, Items = { btnMoveUp, btnMoveDown, btnDeleteCol } }));
+            settingsLayout.Rows.Add(new TableRow(new Panel { Height = 10 })); // padding
+            settingsLayout.Rows.Add(new TableRow(footerControl));
 
             UpdateEditDropDown();
             _groupColumnDropDown.Enabled = _groupByDropDown.SelectedIndex == 2;
