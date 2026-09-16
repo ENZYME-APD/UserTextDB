@@ -109,7 +109,10 @@ namespace RhinoUserTextDatabase.UI
             {
                 if (_editColumnDropDown.SelectedIndex > 0)
                 {
-                    var colDef = _columns[_editColumnDropDown.SelectedIndex - 1];
+                    var selectedKey = _editColumnDropDown.Items[_editColumnDropDown.SelectedIndex].Text;
+                    var colDef = _columns.FirstOrDefault(c => c.Key == selectedKey);
+                    
+                    if (colDef == null) return;
                     newKeyTextBox.Text = colDef.Key;
                     optionsTextBox.Text = string.Join(", ", colDef.Options);
                     
@@ -139,7 +142,10 @@ namespace RhinoUserTextDatabase.UI
             {
                 if (_editColumnDropDown.SelectedIndex <= 0 || currentOverrideInput == null) return;
                 
-                var colKey = _columns[_editColumnDropDown.SelectedIndex - 1].Key;
+                var selectedKey = _editColumnDropDown.Items[_editColumnDropDown.SelectedIndex].Text;
+                var colDef = _columns.FirstOrDefault(c => c.Key == selectedKey);
+                if (colDef == null) return;
+                var colKey = colDef.Key;
                 string val = "";
                 if (currentOverrideInput is DropDown dd) val = dd.SelectedKey ?? "";
                 if (currentOverrideInput is TextBox tb) val = tb.Text;
