@@ -493,6 +493,7 @@ namespace RhinoUserTextDatabase.UI
             RhinoDoc.DeselectObjects += OnSelectionChanged;
             
             LoadAllObjects();
+            RefreshSettingsGrid();
             InitializeGrid();
             
         }
