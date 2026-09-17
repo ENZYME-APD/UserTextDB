@@ -42,6 +42,7 @@ namespace RhinoUserTextDatabase.UI
         private CheckBox _syncSelectionCheckbox;
         private CheckBox _showNameColumnCheckbox;
         private CheckBox _showTypeColumnCheckbox;
+        private CheckBox _hideEmptyObjectsCheckbox;
         private bool _isUpdatingSelection = false;
         public UserTextDatabasePanel()
         {
@@ -430,6 +431,9 @@ namespace RhinoUserTextDatabase.UI
             _showTypeColumnCheckbox = new CheckBox { Text = "Show 'Type' Column", Checked = true };
             _showTypeColumnCheckbox.CheckedChanged += (s, e) => { InitializeGrid(); };
             
+            _hideEmptyObjectsCheckbox = new CheckBox { Text = "Hide Objects with No Data", Checked = false };
+            _hideEmptyObjectsCheckbox.CheckedChanged += (s, e) => RefreshGrid();
+            
 
             var settingsLayout = new TableLayout { Spacing = new Size(5, 5), Padding = new Padding(10) };
             
@@ -467,7 +471,7 @@ namespace RhinoUserTextDatabase.UI
             }
 
             settingsLayout.Rows.Add(new TableRow(new StackLayout { Orientation = Orientation.Horizontal, Spacing = 5, Items = { _newKeyTextBox, btnAddColumn } }));
-            settingsLayout.Rows.Add(new TableRow(new StackLayout { Orientation = Orientation.Horizontal, Spacing = 15, Items = { _showNameColumnCheckbox, _showTypeColumnCheckbox } }));
+            settingsLayout.Rows.Add(new TableRow(new StackLayout { Orientation = Orientation.Horizontal, Spacing = 15, Items = { _showNameColumnCheckbox, _showTypeColumnCheckbox, _hideEmptyObjectsCheckbox } }));
             settingsLayout.Rows.Add(new TableRow { Cells = { _settingsGrid }, ScaleHeight = true });
             settingsLayout.Rows.Add(new TableRow(new StackLayout { Orientation = Orientation.Horizontal, Spacing = 5, Items = { btnMoveUp, btnMoveDown, btnDeleteCol } }));
             settingsLayout.Rows.Add(new TableRow(new Panel { Height = 10 })); // padding
@@ -887,9 +891,11 @@ private void RefreshGrid()
             var filterText = _filterTextBox?.Text?.ToLowerInvariant() ?? "";
             
             // Filter raw objects
+            bool hideEmpty = _hideEmptyObjectsCheckbox?.Checked ?? false;
             var filtered = _rawObjects.Where(o => 
                 MatchesFilter(o, _filterTextBox?.Text) &&
-                (!(_showSelectedOnlyCheckbox?.Checked ?? false) || (RhinoDoc.ActiveDoc?.Objects.FindId(o.ObjectId)?.IsSelected(false) > 0))
+                (!(_showSelectedOnlyCheckbox?.Checked ?? false) || (RhinoDoc.ActiveDoc?.Objects.FindId(o.ObjectId)?.IsSelected(false) > 0)) &&
+                (!hideEmpty || _columns.Any(c => !string.IsNullOrEmpty(o.GetUserString(c.Key))))
             ).ToList();
             
             if (_conduit != null)
