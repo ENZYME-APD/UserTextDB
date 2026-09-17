@@ -7,7 +7,7 @@
 **UserText DB** is a powerful, lightning-fast spreadsheet interface for managing Rhino User Text attributes. Built by [Enzyme](https://www.weareenzyme.com/), it replaces Rhino's native, one-object-at-a-time attribute panel with an interactive, Excel-style grid that makes handling metadata, BIM information, and model data effortless.
 
 ## 📖 Our Story: Light-BIM & Data-Driven Design
-At Enzyme, we have spent years experimenting with the concept of **"Light-BIM"**. Influenced by our 20-year experience using Archicad, and inspired by Grasshopper mentor Ismael Sanz's obsession with data-driven design workflows (and Elefront), we’ve developed workflows that rely heavily on the key-value pairs of UserText in Rhino. 
+At Enzyme, we have spent years experimenting with the concept of **"Light-BIM"**. Influenced by our 20-year experience using Archicad, and inspired by Grasshopper mentor [Ismael Sanz](https://www.linkedin.com/in/ismasanz/)'s obsession with data-driven design workflows (and Elefront), we’ve developed workflows that rely heavily on the key-value pairs of UserText in Rhino. 
 
 Whether it is masterplanning, architectural design, or developing complex geometrical features, we leverage this data to enable computational workflows for geometry automation and data extraction. Our philosophy is simple: **Minimal input, maximum output.**
 
