@@ -1,4 +1,4 @@
-# Enzyme UserText DB for Rhino
+# UserTextDB
 
 ![Version](https://img.shields.io/badge/version-1.0.0_Beta-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Rhino_8-black.svg)
