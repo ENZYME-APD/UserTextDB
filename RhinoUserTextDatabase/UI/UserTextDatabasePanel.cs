@@ -386,7 +386,8 @@ namespace RhinoUserTextDatabase.UI
             viewLayout.BeginVertical();
             var filterStack = new StackLayout { Orientation = Orientation.Horizontal, Spacing = 5, Items = { new StackLayoutItem(_filterTextBox, true), _regexToggle } };
             viewLayout.AddRow("Filter:", filterStack);
-            viewLayout.AddRow("", _showSelectedOnlyCheckbox);
+            var filterCheckboxesStack = new StackLayout { Orientation = Orientation.Horizontal, Spacing = 15, Items = { _showSelectedOnlyCheckbox, _hideEmptyObjectsCheckbox } };
+            viewLayout.AddRow("", filterCheckboxesStack);
             viewLayout.EndVertical();
             viewLayout.AddRow(getSeparator());
             viewLayout.BeginVertical();
@@ -471,7 +472,7 @@ namespace RhinoUserTextDatabase.UI
             }
 
             settingsLayout.Rows.Add(new TableRow(new StackLayout { Orientation = Orientation.Horizontal, Spacing = 5, Items = { _newKeyTextBox, btnAddColumn } }));
-            settingsLayout.Rows.Add(new TableRow(new StackLayout { Orientation = Orientation.Horizontal, Spacing = 15, Items = { _showNameColumnCheckbox, _showTypeColumnCheckbox, _hideEmptyObjectsCheckbox } }));
+            settingsLayout.Rows.Add(new TableRow(new StackLayout { Orientation = Orientation.Horizontal, Spacing = 15, Items = { _showNameColumnCheckbox, _showTypeColumnCheckbox } }));
             settingsLayout.Rows.Add(new TableRow { Cells = { _settingsGrid }, ScaleHeight = true });
             settingsLayout.Rows.Add(new TableRow(new StackLayout { Orientation = Orientation.Horizontal, Spacing = 5, Items = { btnMoveUp, btnMoveDown, btnDeleteCol } }));
             settingsLayout.Rows.Add(new TableRow(new Panel { Height = 10 })); // padding
