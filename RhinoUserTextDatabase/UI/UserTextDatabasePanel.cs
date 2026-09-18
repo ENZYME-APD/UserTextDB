@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Runtime.InteropServices;
 using Eto.Forms;
 using Eto.Drawing;
@@ -22,8 +23,11 @@ namespace RhinoUserTextDatabase.UI
         private int _lastEditedColumn = 2;
         private List<ColumnDefinition> _columns;
         private List<ObjectRowModel> _rawObjects;
-        private DropDown _groupByDropDown;
-        private DropDown _groupColumnDropDown;
+        private DropDown _groupDropdown1;
+        private DropDown _groupDropdown2;
+        private DropDown _groupDropdown3;
+        private DropDown _viewStatesDropDown;
+        private TextBox _newStateNameTextBox;
         private DropDown _sortByDropDown;
         private DropDown _editColumnDropDown;
         private GridView _settingsGrid;
@@ -57,29 +61,16 @@ namespace RhinoUserTextDatabase.UI
                 new ColumnDefinition { Key = "Phase", IsDropdown = false }
             };
             
-            _groupByDropDown = new DropDown();
-            _groupByDropDown.Items.Add("None (Flat)");
-            _groupByDropDown.Items.Add("Object Type");
-            _groupByDropDown.Items.Add("Single Column");
-            _groupByDropDown.Items.Add("Match-All Columns");
-            _groupByDropDown.SelectedIndex = 0;
-
-            _groupColumnDropDown = new DropDown();
+            _groupDropdown1 = new DropDown();
+            _groupDropdown2 = new DropDown();
+            _groupDropdown3 = new DropDown();
+            _groupDropdown1.SelectedIndexChanged += (s, e) => RefreshGrid();
+            _groupDropdown2.SelectedIndexChanged += (s, e) => RefreshGrid();
+            _groupDropdown3.SelectedIndexChanged += (s, e) => RefreshGrid();
             
             _sortByDropDown = new DropDown();
             _sortByDropDown.SelectedIndexChanged += (s, e) => RefreshGrid();
             
-            _groupByDropDown.SelectedIndexChanged += (s, e) => 
-            {
-                _groupColumnDropDown.Enabled = _groupByDropDown.SelectedIndex == 2;
-                RefreshGrid();
-            };
-
-            _groupColumnDropDown.SelectedIndexChanged += (s, e) =>
-            {
-                if (_groupByDropDown.SelectedIndex == 2) RefreshGrid();
-            };
-
             _editColumnDropDown = new DropDown();
             var overrideValueContainer = new Panel();
             var btnApplyOverride = new Button { Text = "Apply to Selected" };
@@ -232,7 +223,8 @@ namespace RhinoUserTextDatabase.UI
                     }
                 }
                 
-                UpdateEditDropDown();
+                SaveSchema();
+                UpdateDynamicDropdowns();
                 RefreshSettingsGrid();
                 InitializeGrid();
             };
@@ -243,7 +235,7 @@ namespace RhinoUserTextDatabase.UI
                     _columns.Add(new ColumnDefinition { Key = nk });
                     _newKeyTextBox.Text = string.Empty;
                     RefreshSettingsGrid();
-                    UpdateEditDropDown();
+                    UpdateDynamicDropdowns();
                     InitializeGrid();
                 }
             };
@@ -293,8 +285,9 @@ namespace RhinoUserTextDatabase.UI
                         }
                         
                         _columns.Remove(sel);
+                        SaveSchema();
                         RefreshSettingsGrid();
-                        UpdateEditDropDown();
+                        UpdateDynamicDropdowns();
                         InitializeGrid();
                     }
                 }
@@ -401,8 +394,8 @@ namespace RhinoUserTextDatabase.UI
             viewLayout.EndVertical();
             viewLayout.AddRow(getSeparator());
             viewLayout.BeginVertical();
-            viewLayout.AddRow("Group By:", _groupByDropDown);
-            viewLayout.AddRow("Column:", _groupColumnDropDown);
+            var groupStack = new StackLayout { Orientation = Orientation.Horizontal, Spacing = 5, Items = { new StackLayoutItem(_groupDropdown1, true), new StackLayoutItem(_groupDropdown2, true), new StackLayoutItem(_groupDropdown3, true) } };
+            viewLayout.AddRow("Group By:", groupStack);
             viewLayout.AddRow("Sort By:", _sortByDropDown);
             viewLayout.EndVertical();
             viewLayout.BeginVertical();
@@ -411,17 +404,49 @@ namespace RhinoUserTextDatabase.UI
             viewLayout.AddRow(null);
 
             var batchLayout = new DynamicLayout { DefaultSpacing = new Size(5, 5), Padding = new Padding(10) };
+            
+            var titleFont = new Eto.Drawing.Font(SystemFonts.Default().Family, 11, Eto.Drawing.FontStyle.Bold);
+            var subFont = new Eto.Drawing.Font(SystemFonts.Default().Family, 10);
+            
+            var title1 = new StackLayout { Orientation = Orientation.Horizontal, Spacing = 5, Items = {
+                new Label { Text = "Batch Edit", Font = titleFont, VerticalAlignment = VerticalAlignment.Center },
+                new Label { Text = "(Applies to all selected objects)", Font = subFont, VerticalAlignment = VerticalAlignment.Center }
+            }};
+            batchLayout.AddRow(title1);
+            batchLayout.AddRow(new Panel { Height = 5 });
+            
             batchLayout.BeginVertical();
-            batchLayout.AddRow("Batch Edit", new Label { Text = "(applies to all selected objects)" });
             batchLayout.AddRow("Target Col:", _editColumnDropDown);
             batchLayout.AddRow("Value:", overrideValueContainer);
             batchLayout.AddRow("", btnApplyOverride);
             batchLayout.EndVertical();
+            
+            batchLayout.AddRow(new Panel { Height = 5 });
             batchLayout.AddRow(getSeparator());
+            batchLayout.AddRow(new Panel { Height = 5 });
+            
+            var title2 = new StackLayout { Orientation = Orientation.Horizontal, Spacing = 5, Items = {
+                new Label { Text = "Data Exchange", Font = titleFont, VerticalAlignment = VerticalAlignment.Center },
+                new Label { Text = "(Import/Export data to excel)", Font = subFont, VerticalAlignment = VerticalAlignment.Center }
+            }};
+            batchLayout.AddRow(title2);
+            batchLayout.AddRow(new Panel { Height = 5 });
+            
             batchLayout.BeginVertical();
             batchLayout.AddRow("CSV Data:", new StackLayout { Orientation = Orientation.Horizontal, Spacing = 5, Items = { btnExport, btnImport } });
             batchLayout.EndVertical();
+            
+            batchLayout.AddRow(new Panel { Height = 5 });
             batchLayout.AddRow(getSeparator());
+            batchLayout.AddRow(new Panel { Height = 5 });
+            
+            var title3 = new StackLayout { Orientation = Orientation.Horizontal, Spacing = 5, Items = {
+                new Label { Text = "User Interface", Font = titleFont, VerticalAlignment = VerticalAlignment.Center },
+                new Label { Text = "(Optimise controls for vertical/horizontal layout)", Font = subFont, VerticalAlignment = VerticalAlignment.Center }
+            }};
+            batchLayout.AddRow(title3);
+            batchLayout.AddRow(new Panel { Height = 5 });
+            
             var btnToggleLayout = new Button { Text = "Switch Vertical/Horizontal UI" };
             batchLayout.BeginVertical();
             batchLayout.AddRow("Panel UI:", btnToggleLayout);
@@ -438,7 +463,7 @@ namespace RhinoUserTextDatabase.UI
 
             
 
-            var settingsLayout = new TableLayout { Spacing = new Size(5, 5), Padding = new Padding(10) };
+            var settingsLayout = new DynamicLayout { DefaultSpacing = new Size(5, 5), Padding = new Padding(10) };
             
             Control footerControl = new Panel();
             try
@@ -446,7 +471,7 @@ namespace RhinoUserTextDatabase.UI
                 var asm = System.Reflection.Assembly.GetExecutingAssembly();
                 var logoImg = Eto.Drawing.Bitmap.FromResource("RhinoUserTextDatabase.Resources.logo.png", asm);
                 
-                var logoView = new ImageView { Image = logoImg, Size = new Eto.Drawing.Size(120, 38) };
+                var logoView = new ImageView { Image = logoImg, Size = new Eto.Drawing.Size(108, 34) };
                 
                 var linkSite = new LinkButton { Text = "www.weareenzyme.com" };
                 linkSite.Click += (s, e) => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = "https://www.weareenzyme.com", UseShellExecute = true });
@@ -454,7 +479,7 @@ namespace RhinoUserTextDatabase.UI
                 var linkEmail = new LinkButton { Text = "digital@weareenzyme.com" };
                 linkEmail.Click += (s, e) => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = "mailto:digital@weareenzyme.com", UseShellExecute = true });
                 
-                var lblVersion = new Label { Text = "v1.0.2 Beta", TextColor = Eto.Drawing.Colors.Gray };
+                var lblVersion = new Label { Text = "v1.1.20 Beta", TextColor = Eto.Drawing.Colors.Gray };
                 
                 var leftStack = new StackLayout { Orientation = Orientation.Vertical, Items = { logoView }, VerticalContentAlignment = VerticalAlignment.Center };
                 var rightStack = new StackLayout { 
@@ -473,20 +498,89 @@ namespace RhinoUserTextDatabase.UI
                 Rhino.RhinoApp.WriteLine($"Error loading branding: {ex.Message}");
             }
 
-            settingsLayout.Rows.Add(new TableRow(new StackLayout { Orientation = Orientation.Horizontal, Spacing = 5, Items = { _newKeyTextBox, btnAddColumn } }));
-            settingsLayout.Rows.Add(new TableRow(new StackLayout { Orientation = Orientation.Horizontal, Spacing = 15, Items = { _showNameColumnCheckbox, _showTypeColumnCheckbox } }));
-            settingsLayout.Rows.Add(new TableRow { Cells = { _settingsGrid }, ScaleHeight = true });
-            settingsLayout.Rows.Add(new TableRow(new StackLayout { Orientation = Orientation.Horizontal, Spacing = 5, Items = { btnMoveUp, btnMoveDown, btnDeleteCol } }));
-            settingsLayout.Rows.Add(new TableRow(new Panel { Height = 10 })); // padding
-            settingsLayout.Rows.Add(new TableRow(footerControl));
+            var infoLayout = new DynamicLayout { DefaultSpacing = new Size(5, 5), Padding = new Padding(20) };
+            
+            var descFont = new Eto.Drawing.Font(SystemFonts.Default().Family, 11);
+            
+            var linkDocs = new LinkButton { Text = "📖 Read Documentation on GitHub" };
+            linkDocs.Click += (s, e) => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = "https://enzyme-apd.github.io/UserTextDB/", UseShellExecute = true });
+            
+            // Force strict left-alignment by embedding inside a stretched vertical stack layout.
+            // Wrapping horizontal stacks enforce minimum bounding box for the titles, ensuring exact left placement.
+            var contentStack = new StackLayout {
+                Orientation = Orientation.Vertical,
+                HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                Spacing = 5,
+                Items = {
+                    new StackLayout { Orientation = Orientation.Horizontal, Items = { new Label { Text = "About", Font = titleFont } } },
+                    new Panel { Height = 5 },
+                    new Label { Text = "UserText DB is an Excel-style database management tool for Rhino User Text. It allows you to quickly view, select, batch-edit, and organize object metadata using a dynamic spreadsheet interface.", Wrap = WrapMode.Word, Font = descFont, TextAlignment = TextAlignment.Left },
+                    new Panel { Height = 5 },
+                    new Label { Text = "It features a powerful search system (including Regex and Google-style search) as well as advanced database functions.", Wrap = WrapMode.Word, Font = descFont, TextAlignment = TextAlignment.Left },
+                    new Panel { Height = 5 },
+                    new Label { Text = "For a detailed explanation, examples, and cheat sheets, please check out our documentation.", Wrap = WrapMode.Word, Font = descFont, TextAlignment = TextAlignment.Left },
+                    new Panel { Height = 5 },
+                    new StackLayout { Orientation = Orientation.Horizontal, Items = { linkDocs } },
+                    getSeparator(),
+                    footerControl
+                }
+            };
+            
+            infoLayout.AddRow(contentStack);
+            infoLayout.AddRow(null);
 
-            UpdateEditDropDown();
-            _groupColumnDropDown.Enabled = _groupByDropDown.SelectedIndex == 2;
+            UpdateDynamicDropdowns();
+
+            _viewStatesDropDown = new DropDown();
+            var btnLoadState = new Button { Text = "Load" };
+            btnLoadState.Click += (s, e) => ApplyViewState();
+            var btnDeleteState = new Button { Text = "Delete" };
+            btnDeleteState.Click += (s, e) => DeleteViewState();
+            
+            _newStateNameTextBox = new TextBox { PlaceholderText = "New State Name..." };
+            var btnSaveState = new Button { Text = "Save" };
+            btnSaveState.Click += (s, e) => SaveViewState();
+
+            settingsLayout.AddRow(new StackLayout { 
+                Orientation = Orientation.Horizontal, Spacing = 5, 
+                Items = { new Label { Text = "States:", VerticalAlignment = VerticalAlignment.Center }, new StackLayoutItem(_viewStatesDropDown, true), btnLoadState, btnDeleteState } 
+            });
+            
+            settingsLayout.AddRow(new StackLayout { 
+                Orientation = Orientation.Horizontal, Spacing = 5, 
+                Items = { new Label { Text = "Save:  ", VerticalAlignment = VerticalAlignment.Center }, new StackLayoutItem(_newStateNameTextBox, true), btnSaveState } 
+            });
+
+            settingsLayout.AddRow(getSeparator());
+
+            settingsLayout.AddRow(new StackLayout { 
+                Orientation = Orientation.Horizontal, Spacing = 5, 
+                Items = { new StackLayoutItem(_newKeyTextBox, true), btnAddColumn } 
+            });
+            
+            settingsLayout.AddRow(new StackLayout { 
+                Orientation = Orientation.Horizontal, Spacing = 15, 
+                Items = { _showNameColumnCheckbox, _showTypeColumnCheckbox } 
+            });
+
+            _settingsGrid.Height = 150;
+            settingsLayout.AddRow(_settingsGrid);
+
+            settingsLayout.AddRow(new StackLayout { 
+                Orientation = Orientation.Horizontal, Spacing = 5, 
+                Items = { btnMoveUp, btnMoveDown, btnDeleteCol } 
+            });
+            settingsLayout.AddRow(null);
 
             var tabs = new TabControl();
-            tabs.Pages.Add(new TabPage { Text = "View & Select", Content = viewLayout });
+            tabs.Pages.Add(new TabPage { Text = "Group & Select", Content = viewLayout });
             tabs.Pages.Add(new TabPage { Text = "Batch Data", Content = batchLayout });
-            tabs.Pages.Add(new TabPage { Text = "Settings", Content = settingsLayout });
+            tabs.Pages.Add(new TabPage { Text = "Grid Settings", Content = settingsLayout });
+            tabs.Pages.Add(new TabPage { Text = "Info", Content = infoLayout });
+
+            LoadViewStates();
+
+
 
             
 
@@ -498,8 +592,8 @@ namespace RhinoUserTextDatabase.UI
                 FixedPanel = SplitterFixedPanel.Panel1,
                 Panel1 = tabs,
                 Panel2 = _gridContainer,
-                Panel1MinimumSize = 400,
-                Position = 400
+                Panel1MinimumSize = 360,
+                Position = 360
             };
 
             btnToggleLayout.Click += (s, e) =>
@@ -507,14 +601,14 @@ namespace RhinoUserTextDatabase.UI
                 if (splitter.Orientation == Orientation.Vertical)
                 {
                     splitter.Orientation = Orientation.Horizontal;
-                    splitter.Panel1MinimumSize = 330;
-                    splitter.Position = 335;
+                    splitter.Panel1MinimumSize = 360;
+                    splitter.Position = 360;
                 }
                 else
                 {
                     splitter.Orientation = Orientation.Vertical;
-                    splitter.Panel1MinimumSize = 400;
-                    splitter.Position = 400;
+                    splitter.Panel1MinimumSize = 360;
+                    splitter.Position = 360;
                 }
             };
             
@@ -562,10 +656,51 @@ namespace RhinoUserTextDatabase.UI
             
         }
 
+        private void SaveSchema()
+        {
+            if (RhinoDoc.ActiveDoc == null) return;
+            try {
+                string json = JsonSerializer.Serialize(_columns);
+                RhinoDoc.ActiveDoc.Strings.SetString("UserTextDB", "Schema", json);
+            } catch { }
+        }
+
+        private void LoadSchema()
+        {
+            if (RhinoDoc.ActiveDoc == null) return;
+            string json = RhinoDoc.ActiveDoc.Strings.GetValue("UserTextDB", "Schema");
+            if (!string.IsNullOrEmpty(json))
+            {
+                try {
+                    var savedCols = JsonSerializer.Deserialize<System.Collections.Generic.List<ColumnDefinition>>(json);
+                    if (savedCols != null && savedCols.Count > 0)
+                    {
+                        var existingKeys = new System.Collections.Generic.HashSet<string>(_columns.Select(c => c.Key), StringComparer.OrdinalIgnoreCase);
+                        foreach (var sc in savedCols)
+                        {
+                            if (!existingKeys.Contains(sc.Key))
+                            {
+                                _columns.Add(sc);
+                                existingKeys.Add(sc.Key);
+                            }
+                            else
+                            {
+                                var match = _columns.First(c => c.Key.Equals(sc.Key, StringComparison.OrdinalIgnoreCase));
+                                match.IsDropdown = sc.IsDropdown;
+                                match.Options = sc.Options;
+                            }
+                        }
+                    }
+                } catch { }
+            }
+        }
+
         private void LoadAllObjects()
         {
             _rawObjects.Clear();
             if (RhinoDoc.ActiveDoc == null) return;
+            
+            LoadSchema();
             
             var settings = new Rhino.DocObjects.ObjectEnumeratorSettings
             {
@@ -596,7 +731,9 @@ namespace RhinoUserTextDatabase.UI
             
             if (newColumnsAdded)
             {
-                UpdateEditDropDown();
+                SaveSchema();
+                SaveSchema();
+                UpdateDynamicDropdowns();
                 RefreshSettingsGrid();
                 InitializeGrid();
             }
@@ -604,6 +741,136 @@ namespace RhinoUserTextDatabase.UI
             {
                 RefreshGrid();
             }
+        }
+
+
+        private void LoadViewStates()
+        {
+            if (_viewStatesDropDown == null) return;
+            _viewStatesDropDown.Items.Clear();
+            if (RhinoDoc.ActiveDoc == null) return;
+            string json = RhinoDoc.ActiveDoc.Strings.GetValue("UserTextDB", "ViewStates");
+            if (!string.IsNullOrEmpty(json))
+            {
+                try {
+                    var states = JsonSerializer.Deserialize<System.Collections.Generic.Dictionary<string, System.Collections.Generic.List<string>>>(json);
+                    if (states != null)
+                    {
+                        foreach (var key in states.Keys) _viewStatesDropDown.Items.Add(key);
+                    }
+                } catch { }
+            }
+            if (_viewStatesDropDown.Items.Count > 0) _viewStatesDropDown.SelectedIndex = 0;
+        }
+
+        private void SaveViewState()
+        {
+            var name = _newStateNameTextBox?.Text?.Trim();
+            if (string.IsNullOrEmpty(name) || RhinoDoc.ActiveDoc == null) return;
+            
+            var states = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.List<string>>();
+            string json = RhinoDoc.ActiveDoc.Strings.GetValue("UserTextDB", "ViewStates");
+            if (!string.IsNullOrEmpty(json))
+            {
+                try { 
+                    var deserialized = JsonSerializer.Deserialize<System.Collections.Generic.Dictionary<string, System.Collections.Generic.List<string>>>(json);
+                    if (deserialized != null) states = deserialized;
+                } catch { }
+            }
+            
+            var visibleKeys = _columns.Where(c => c.IsVisible).Select(c => c.Key).ToList();
+            states[name] = visibleKeys;
+            
+            RhinoDoc.ActiveDoc.Strings.SetString("UserTextDB", "ViewStates", JsonSerializer.Serialize(states));
+            if (_newStateNameTextBox != null) _newStateNameTextBox.Text = "";
+            LoadViewStates();
+            _viewStatesDropDown.SelectedKey = name;
+        }
+        
+        private void ApplyViewState()
+        {
+            if (_viewStatesDropDown == null || _viewStatesDropDown.SelectedIndex < 0 || RhinoDoc.ActiveDoc == null) return;
+            var name = _viewStatesDropDown.SelectedKey;
+            
+            string json = RhinoDoc.ActiveDoc.Strings.GetValue("UserTextDB", "ViewStates");
+            if (string.IsNullOrEmpty(json)) return;
+            try {
+                var states = JsonSerializer.Deserialize<System.Collections.Generic.Dictionary<string, System.Collections.Generic.List<string>>>(json);
+                if (states != null && states.ContainsKey(name))
+                {
+                    var keys = states[name];
+                    foreach (var col in _columns) col.IsVisible = false;
+                    
+                    var newCols = new System.Collections.Generic.List<ColumnDefinition>();
+                    foreach (var k in keys)
+                    {
+                        var match = _columns.FirstOrDefault(c => c.Key == k);
+                        if (match != null)
+                        {
+                            match.IsVisible = true;
+                            newCols.Add(match);
+                        }
+                    }
+                    foreach (var col in _columns)
+                    {
+                        if (!newCols.Contains(col)) newCols.Add(col);
+                    }
+                    _columns = newCols;
+                    
+                    RefreshSettingsGrid();
+                    UpdateDynamicDropdowns();
+                    InitializeGrid();
+                }
+            } catch { }
+        }
+        
+        private void DeleteViewState()
+        {
+            if (_viewStatesDropDown == null || _viewStatesDropDown.SelectedIndex < 0 || RhinoDoc.ActiveDoc == null) return;
+            var name = _viewStatesDropDown.SelectedKey;
+            
+            string json = RhinoDoc.ActiveDoc.Strings.GetValue("UserTextDB", "ViewStates");
+            if (string.IsNullOrEmpty(json)) return;
+            try {
+                var states = JsonSerializer.Deserialize<System.Collections.Generic.Dictionary<string, System.Collections.Generic.List<string>>>(json);
+                if (states != null && states.ContainsKey(name))
+                {
+                    states.Remove(name);
+                    RhinoDoc.ActiveDoc.Strings.SetString("UserTextDB", "ViewStates", JsonSerializer.Serialize(states));
+                    LoadViewStates();
+                }
+            } catch { }
+        }
+
+        private System.Collections.Generic.IEnumerable<DatabaseTreeItem> GroupItems(System.Collections.Generic.IEnumerable<ObjectRowModel> items, System.Collections.Generic.List<string> keys, int keyIndex)
+        {
+            if (keyIndex >= keys.Count)
+            {
+                return items.Select(o => new DatabaseTreeItem(o));
+            }
+            
+            string currentKey = keys[keyIndex];
+            
+            System.Collections.Generic.IEnumerable<System.Linq.IGrouping<string, ObjectRowModel>> groups;
+            if (currentKey == "Type")
+            {
+                groups = items.GroupBy(o => o.ObjectType).OrderBy(g => g.Key);
+            }
+            else
+            {
+                groups = items.GroupBy(o => string.IsNullOrEmpty(o.GetUserString(currentKey)) ? "Unassigned" : o.GetUserString(currentKey)).OrderBy(g => g.Key);
+            }
+            
+            var result = new System.Collections.Generic.List<DatabaseTreeItem>();
+            foreach (var g in groups)
+            {
+                string title = currentKey == "Type" ? $"Type: {g.Key}" : $"{currentKey}: {g.Key}";
+                var groupNode = new DatabaseTreeItem(title);
+                var children = GroupItems(g, keys, keyIndex + 1);
+                foreach (var c in children) groupNode.Children.Add(c);
+                result.Add(groupNode);
+            }
+            return result;
         }
 
         private void OnAddObject(object? sender, RhinoObjectEventArgs e)
@@ -628,7 +895,7 @@ namespace RhinoUserTextDatabase.UI
                 
                 if (newColumnsAdded)
                 {
-                    UpdateEditDropDown();
+                    UpdateDynamicDropdowns();
                     InitializeGrid();
                 }
                 else
@@ -912,53 +1179,21 @@ private void RefreshGrid()
                 filtered = filtered.OrderBy(o => o.GetUserString(sortKey) ?? "").ToList();
             }
 
-            int mode = _groupByDropDown.SelectedIndex;
+            var activeGroupKeys = new System.Collections.Generic.List<string>();
+            if (_groupDropdown1 != null && _groupDropdown1.SelectedIndex > 0) activeGroupKeys.Add(_groupDropdown1.SelectedKey);
+            if (_groupDropdown2 != null && _groupDropdown2.SelectedIndex > 0) activeGroupKeys.Add(_groupDropdown2.SelectedKey);
+            if (_groupDropdown3 != null && _groupDropdown3.SelectedIndex > 0) activeGroupKeys.Add(_groupDropdown3.SelectedKey);
+            
+            activeGroupKeys = activeGroupKeys.Distinct().ToList();
 
-            if (mode == 0) // Flat
+            if (activeGroupKeys.Count == 0)
             {
-                foreach (var obj in filtered)
-                    _dataStore.Add(new DatabaseTreeItem(obj));
+                foreach (var o in filtered) _dataStore.Add(new DatabaseTreeItem(o));
             }
-            else if (mode == 1) // Group by Type
+            else
             {
-                var grouped = filtered.GroupBy(o => o.ObjectType);
-                foreach (var g in grouped)
-                {
-                    var parent = new DatabaseTreeItem($"Type: {g.Key}");
-                    foreach (var child in g) parent.Children.Add(new DatabaseTreeItem(child));
-                    _dataStore.Add(parent);
-                }
-            }
-            else if (mode == 2) // Single Column
-            {
-                var colKey = _groupColumnDropDown.SelectedKey ?? "";
-                if (!string.IsNullOrEmpty(colKey))
-                {
-                    var grouped = filtered.GroupBy(o => string.IsNullOrEmpty(o.GetUserString(colKey)) ? "Unassigned" : o.GetUserString(colKey));
-                    foreach (var g in grouped)
-                    {
-                        var parent = new DatabaseTreeItem($"{colKey}: {g.Key}");
-                        foreach (var child in g) parent.Children.Add(new DatabaseTreeItem(child));
-                        _dataStore.Add(parent);
-                    }
-                }
-            }
-            else if (mode == 3) // Match-All-Keys
-            {
-                var grouped = filtered.GroupBy(o => string.Join("|", _columns.Select(c => o.GetUserString(c.Key))));
-                foreach (var g in grouped)
-                {
-                    var firstObj = g.First();
-                    var kvps = _columns.Select(c => $"{c.Key}: {firstObj.GetUserString(c.Key)}")
-                                       .Where(s => !s.EndsWith(": "))
-                                       .ToList();
-                                       
-                    string displayTitle = kvps.Count > 0 ? string.Join(", ", kvps) : "No Metadata";
-                    var parent = new DatabaseTreeItem(displayTitle);
-                    
-                    foreach (var child in g) parent.Children.Add(new DatabaseTreeItem(child));
-                    _dataStore.Add(parent);
-                }
+                var groupedItems = GroupItems(filtered, activeGroupKeys, 0);
+                foreach (var g in groupedItems) _dataStore.Add(g);
             }
             
             if (_grid != null) _grid.DataStore = _dataStore;
@@ -1152,28 +1387,36 @@ private void RefreshGrid()
         }
 
         
-        private void UpdateEditDropDown()
+        private void UpdateDynamicDropdowns()
         {
             var visibleCols = _columns.Where(c => c.IsVisible).ToList();
             
             var prevEdit = _editColumnDropDown?.SelectedKey;
             if (_editColumnDropDown != null) {
                 _editColumnDropDown.Items.Clear();
-                _editColumnDropDown.Items.Add("--- New Column ---");
+                _editColumnDropDown.Items.Add("--- Select Column ---");
                 foreach (var c in visibleCols) _editColumnDropDown.Items.Add(c.Key);
                 var existingEdit = _editColumnDropDown.Items.FirstOrDefault(i => i.Text == prevEdit);
                 if (existingEdit != null) _editColumnDropDown.SelectedKey = existingEdit.Key;
                 else _editColumnDropDown.SelectedIndex = 0;
             }
 
-            var prevGroup = _groupColumnDropDown?.SelectedKey;
-            if (_groupColumnDropDown != null) {
-                _groupColumnDropDown.Items.Clear();
-                foreach (var c in visibleCols) _groupColumnDropDown.Items.Add(c.Key);
-                var existingGroup = _groupColumnDropDown.Items.FirstOrDefault(i => i.Text == prevGroup);
-                if (existingGroup != null) _groupColumnDropDown.SelectedKey = existingGroup.Key;
-                else if (_groupColumnDropDown.Items.Count > 0) _groupColumnDropDown.SelectedIndex = 0;
+
+            
+            void populateGroup(DropDown dd) {
+                var prev = dd?.SelectedKey;
+                if (dd != null) {
+                    dd.Items.Clear();
+                    dd.Items.Add("None");
+                    foreach (var c in visibleCols) dd.Items.Add(c.Key);
+                    var existing = dd.Items.FirstOrDefault(i => i.Text == prev);
+                    if (existing != null) dd.SelectedKey = existing.Key;
+                    else if (dd.Items.Count > 0) dd.SelectedIndex = 0;
+                }
             }
+            populateGroup(_groupDropdown1);
+            populateGroup(_groupDropdown2);
+            populateGroup(_groupDropdown3);
 
             var prevAudit = _auditColumnDropDown?.SelectedKey;
             if (_auditColumnDropDown != null) {

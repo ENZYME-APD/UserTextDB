@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <TargetExt>.rhp</TargetExt>
     <GenerateYakPackage>true</GenerateYakPackage>
-    <Version>1.0.2</Version>
+    <Version>1.0.3</Version>
     <Title>User Text Database</Title>
     <Description>Excel-style database management for Rhino User Text.</Description>
     <Authors>jb</Authors>
