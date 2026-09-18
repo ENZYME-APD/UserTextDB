@@ -322,6 +322,9 @@ namespace RhinoUserTextDatabase.UI
 
             _showSelectedOnlyCheckbox = new CheckBox { Text = "Show Only Selected in Grid", Checked = false };
             _showSelectedOnlyCheckbox.CheckedChanged += (s, e) => RefreshGrid();
+            
+            _hideEmptyObjectsCheckbox = new CheckBox { Text = "Hide Objects with No Data", Checked = false };
+            _hideEmptyObjectsCheckbox.CheckedChanged += (s, e) => RefreshGrid();
 
             _selectKeyDropDown = new DropDown();
             _selectValueDropDown = new DropDown();
@@ -432,8 +435,7 @@ namespace RhinoUserTextDatabase.UI
             _showTypeColumnCheckbox = new CheckBox { Text = "Show 'Type' Column", Checked = true };
             _showTypeColumnCheckbox.CheckedChanged += (s, e) => { InitializeGrid(); };
             
-            _hideEmptyObjectsCheckbox = new CheckBox { Text = "Hide Objects with No Data", Checked = false };
-            _hideEmptyObjectsCheckbox.CheckedChanged += (s, e) => RefreshGrid();
+
             
 
             var settingsLayout = new TableLayout { Spacing = new Size(5, 5), Padding = new Padding(10) };
@@ -452,7 +454,7 @@ namespace RhinoUserTextDatabase.UI
                 var linkEmail = new LinkButton { Text = "digital@weareenzyme.com" };
                 linkEmail.Click += (s, e) => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = "mailto:digital@weareenzyme.com", UseShellExecute = true });
                 
-                var lblVersion = new Label { Text = "v1.0.1 Beta", TextColor = Eto.Drawing.Colors.Gray };
+                var lblVersion = new Label { Text = "v1.0.2 Beta", TextColor = Eto.Drawing.Colors.Gray };
                 
                 var leftStack = new StackLayout { Orientation = Orientation.Vertical, Items = { logoView }, VerticalContentAlignment = VerticalAlignment.Center };
                 var rightStack = new StackLayout { 
