@@ -452,7 +452,7 @@ namespace RhinoUserTextDatabase.UI
                 var linkEmail = new LinkButton { Text = "digital@weareenzyme.com" };
                 linkEmail.Click += (s, e) => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = "mailto:digital@weareenzyme.com", UseShellExecute = true });
                 
-                var lblVersion = new Label { Text = "v1.0.0 Beta", TextColor = Eto.Drawing.Colors.Gray };
+                var lblVersion = new Label { Text = "v1.0.1 Beta", TextColor = Eto.Drawing.Colors.Gray };
                 
                 var leftStack = new StackLayout { Orientation = Orientation.Vertical, Items = { logoView }, VerticalContentAlignment = VerticalAlignment.Center };
                 var rightStack = new StackLayout { 
